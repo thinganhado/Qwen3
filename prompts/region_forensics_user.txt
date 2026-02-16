@@ -1,9 +1,6 @@
-This region corresponds to {time} section, {frequency} frequency band, {phoneme} token, and {feature} feature.
-Sample ID: {sample_id}
-Region ID: {region_id}
-Crop method: {crop_method}
+This is an artifact description for a spectrogram region. 
+{<think> <answer>}
 
-Additional evidence:
-{input_text}
+This is the metadata of the region: {}.
 
-Please provide your thinking process within <think></think> and your final artifact description E within <answer></answer>.
+Please strictly follow the instructions to polish it
