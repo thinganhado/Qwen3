@@ -28,7 +28,7 @@ A) Extract predicted labels only from:
   - `phoneme_pred` must be one of `{consonant, vowel, unvoiced}`
   - `feature_pred` must be one of `{coarticulation, frication, formant bands, harmonic structure, no dominant speech feature}`
 
-B) Compare all predicted labels with `<META ...>` exactly (case-sensitive, same wording).
+B) Compare all predicted labels with `<META ...>` exactly.
 - If any field differs, output `<answer>mismatch</answer>` and stop.
 
 STEP 2: INTERNAL CONSISTENCY CHECK
@@ -39,19 +39,11 @@ Check for contradictions between:
 If any contradiction exists, output `<answer>mismatch</answer>` and stop.
 
 STEP 3: POLISHING (ONLY IF STEPS 1 AND 2 PASS)
-Using only the provided `<think>` and original `<answer>`, rewrite into one cohesive paragraph of exactly 4 sentences.
-Do not add any new facts.
-
-Sentence order must be exactly:
-1) What the artifact is (plain description from the given text).
-2) Where the artifact is (only timing and frequency; no timestamps).
-3) What it looks like visually (only already stated shape, texture, color intensity, or absence of structure).
-4) Audio impact (only already stated perceptual listening impact; no new effects).
-
-COHESION RULES
-- Write exactly one paragraph with exactly 4 sentences.
-- Keep the same artifact identity across all sentences (use terms like "it", "this artifact", or "this region").
-- No bullet points, no extra sentences, and no line breaks.
+Using only the provided `<think>` and original `<answer>`, rewrite into one cohesive paragraph of exactly 4 sentences answering these following questions:
+1) What the artifact is.
+2) Where the artifact is.
+3) What it looks like visually.
+4) What it means on audio impact.
 
 OUTPUT FORMAT
 If mismatch:
