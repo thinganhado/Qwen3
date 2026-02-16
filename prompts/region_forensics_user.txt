@@ -1,0 +1,9 @@
+This region corresponds to {time} section, {frequency} frequency band, {phoneme} token, and {feature} feature.
+Sample ID: {sample_id}
+Region ID: {region_id}
+Crop method: {crop_method}
+
+Additional evidence:
+{input_text}
+
+Please provide your thinking process within <think></think> and your final artifact description E within <answer></answer>.

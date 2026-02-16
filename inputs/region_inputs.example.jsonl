@@ -1,0 +1,2 @@
+{"sample_id":"demo_0001","region_id":0,"time":"speech","frequency":"mid","phoneme":"vowel","feature":"formant bands","crop_method":"GRID","input_text":"Observed blurred horizontal bands and reduced contrast relative to reference region."}
+{"sample_id":"demo_0001","region_id":1,"time":"non-speech","frequency":"high","phoneme":"unvoiced","feature":"frication","crop_method":"SAM","input_text":"Region appears noise-dominant with irregular high-frequency streaks and weak structure."}
