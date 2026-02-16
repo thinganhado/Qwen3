@@ -76,10 +76,10 @@ def _read_input_items(args: argparse.Namespace):
                     "feature": str(region.get("feature", "")),
                 }
                 metadata_line = (
-                    f"time={meta['time']}; "
-                    f"frequency={meta['frequency']}; "
-                    f"phoneme={meta['phoneme']}; "
-                    f"feature={meta['feature']}"
+                    f'time="{meta["time"]}" '
+                    f'frequency="{meta["frequency"]}" '
+                    f'phoneme="{meta["phoneme"]}" '
+                    f'feature="{meta["feature"]}"'
                 )
                 items.append(
                     {

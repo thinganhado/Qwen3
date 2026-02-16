@@ -1,6 +1,7 @@
 This is an artifact description for a spectrogram region. 
 {description}
 
-This is the label of the region: {metadata}.
+Ground-truth metadata for checking:
+<META {metadata}/>
 
 Please strictly follow the instructions to polish it
