@@ -4,8 +4,8 @@ Do not invent, infer, or add information.
 
 INPUT FORMAT:
 You will receive:
-1) Ground-truth metadata:
-<META timing="speech|non-speech" freq="low|mid|high" phoneme="vowel|consonant|none" feature="boundary/coarticulation|formant|frication|harmonic structure|none"/>
+1) Ground-truth metadata in this format:
+<META timing="speech or non-speech" freq="low, mid, or high" phoneme="vowel, consonant, or none" feature="boundary coarticulation, formant, frication, harmonic structure, or none"/>
 
 2) Model output to process:
 <think>
@@ -15,7 +15,7 @@ You will receive:
 <answer>...</answer>
 
 GLOBAL RULES:
-- Use only information explicitly present in <Localization>, <Acoustic_analysis>, and the original <answer>.
+- Use only information explicitly present in Localization, Acoustic_analysis, and the original answer.
 - Do not add timestamps or time ranges.
 - Do not explain causes or mechanisms.
 - If any verification step fails, output exactly:
@@ -24,41 +24,41 @@ GLOBAL RULES:
 
 STEP 1: LABEL CONSISTENCY CHECK (STRICT)
 A) Extract predicted labels only from:
-- timing and freq: from <Localization>
-- phoneme and feature: from the first clause of <Acoustic_analysis>
+- Timing and frequency from Localization.
+- Phoneme and feature from the first clause of Acoustic_analysis.
 
-B) Map predicted labels into META vocabulary:
-- timing: speech | non-speech
-- freq: low | mid | high
-- phoneme mapping:
-  vowel -> vowel
-  consonant -> consonant
-  unvoiced -> none
-- feature mapping:
-  coarticulation -> boundary/coarticulation
-  formant bands -> formant
-  frication -> frication
-  harmonic structure -> harmonic structure
-  no dominant speech feature -> none
+B) Convert predicted labels to the META vocabulary:
+- Timing must be speech or non-speech.
+- Frequency must be low, mid, or high.
+- For phoneme:
+  If predicted phoneme is vowel, use vowel.
+  If predicted phoneme is consonant, use consonant.
+  If predicted phoneme is unvoiced, use none.
+- For feature:
+  If predicted feature is coarticulation, use boundary coarticulation.
+  If predicted feature is formant bands, use formant.
+  If predicted feature is frication, use frication.
+  If predicted feature is harmonic structure, use harmonic structure.
+  If predicted feature is no dominant speech feature, use none.
 
-C) Compare mapped labels to <META ...> exactly.
-If any field differs, output mismatch and stop.
+C) Compare the converted labels with META exactly.
+If any field is different, output mismatch and stop.
 
 STEP 2: INTERNAL CONSISTENCY CHECK (STRICT)
-Verify no contradictions between:
-- <Localization> and <Acoustic_analysis>
-- <think> content and original <answer> content
+Verify there are no contradictions between:
+- Localization and Acoustic_analysis.
+- The think content and the original answer content.
 If any contradiction exists, output mismatch and stop.
 
-STEP 3: POLISHING (ONLY IF STEPS 1-2 PASS)
-Write exactly one paragraph with exactly 4 sentences in this order:
-1) WHAT: one plain sentence naming the artifact from given content only.
-2) WHERE: timing (speech/non-speech) and frequency (low/mid/high) only.
-3) VISUAL: only stated visual cues (shape, texture, color intensity, or absence of structure).
-4) AUDIO: only stated perceptual listening impact (no new effects).
+STEP 3: POLISHING (ONLY IF STEPS 1 AND 2 PASS)
+Write exactly one paragraph with exactly four sentences in this order:
+1) What: one plain sentence naming the artifact based only on given content.
+2) Where: timing and frequency only.
+3) Visual: only stated visual cues, such as shape, texture, color intensity, or absence of structure.
+4) Audio: only stated perceptual listening impact, with no new effects.
 
 POLISHING CONSTRAINTS:
-- Exactly 4 sentences.
+- Exactly four sentences.
 - Do not add new labels, facts, or interpretations.
 
 OUTPUT FORMAT (EXACT):
@@ -66,4 +66,4 @@ If mismatch:
 <answer>mismatch</answer>
 
 If pass:
-<answer>Sentence1. Sentence2. Sentence3. Sentence4.</answer>
+<answer>Sentence 1. Sentence 2. Sentence 3. Sentence 4.</answer>
