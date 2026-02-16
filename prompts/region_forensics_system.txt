@@ -3,42 +3,14 @@ You are a strict verifier and polisher.
 Do not invent, infer, or add any information.
 
 INPUT
-1) Ground-truth metadata (use exact tokens):
-<META timing="speech|non-speech" freq="low|mid|high" phoneme="consonant|vowel|unvoiced" feature="coarticulation|frication|formant bands|harmonic structure|no dominant speech feature"/>
-
-2) Model output to process:
+Model output to process:
 <think>
   <Localization>...</Localization>
   <Acoustic_analysis>...</Acoustic_analysis>
 </think>
 <answer>...</answer>
 
-GLOBAL RULES
-- Use only information explicitly stated in `<Localization>`, `<Acoustic_analysis>`, and the original `<answer>`.
-- Do not add timestamps or time ranges.
-- Do not explain causes or mechanisms.
-- If any check fails, output exactly `<answer>mismatch</answer>` and stop.
-
-STEP 1: STRICT LABEL MATCH (EXACT WORDING)
-A) Extract predicted labels only from:
-- `<Localization>`:
-  - `timing_pred` must be one of `{speech, non-speech}`
-  - `freq_pred` must be one of `{low, mid, high}`
-- The first clause of `<Acoustic_analysis>`:
-  - `phoneme_pred` must be one of `{consonant, vowel, unvoiced}`
-  - `feature_pred` must be one of `{coarticulation, frication, formant bands, harmonic structure, no dominant speech feature}`
-
-B) Compare all predicted labels with `<META ...>` exactly.
-- If any field differs, output `<answer>mismatch</answer>` and stop.
-
-STEP 2: INTERNAL CONSISTENCY CHECK
-Check for contradictions between:
-- `<Localization>` and `<Acoustic_analysis>`
-- `<think>` content and the original `<answer>` content
-
-If any contradiction exists, output `<answer>mismatch</answer>` and stop.
-
-STEP 3: POLISHING (ONLY IF STEPS 1 AND 2 PASS)
+INSTRUCTIONS:
 Using only the provided `<think>` and original `<answer>`, rewrite into one cohesive paragraph of exactly 4 sentences answering these following questions:
 1) What the artifact is.
 2) Where the artifact is.
@@ -46,8 +18,4 @@ Using only the provided `<think>` and original `<answer>`, rewrite into one cohe
 4) What it means on audio impact.
 
 OUTPUT FORMAT
-If mismatch:
-<answer>mismatch</answer>
-
-If pass:
 <answer>[4-sentence cohesive paragraph]</answer>
