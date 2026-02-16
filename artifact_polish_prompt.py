@@ -13,8 +13,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 THIS_DIR = Path(__file__).resolve().parent
 DEFAULT_SYSTEM_FILE = THIS_DIR / "prompts" / "region_forensics_system.txt"
 DEFAULT_USER_TEMPLATE_FILE = THIS_DIR / "prompts" / "region_forensics_user.txt"
-DEFAULT_OUTPUT_DIR = THIS_DIR / "outputs" / "qwen3_text"
-DEFAULT_MODEL_ID = "Qwen/Qwen3-8B-Instruct-2507"
+DEFAULT_INPUT_QWEN3_VL_ROOT = Path("/scratch3/che489/Ha/interspeech/localization/qwen3_vlm")
+DEFAULT_OUTPUT_DIR = Path("/scratch3/che489/Ha/interspeech/localization/qwen3_polished")
+DEFAULT_MODEL_ID = "/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/LLM/Qwen3-235B-A22B-Instruct-2507/"
 
 
 def _load_text_file(path: Path, field_name: str) -> str:
@@ -204,7 +205,7 @@ def parse_args():
 
     parser.add_argument(
         "--input-qwen3-vl-root",
-        default=None,
+        default=str(DEFAULT_INPUT_QWEN3_VL_ROOT),
         help="Root folder containing Qwen3-VL grouped outputs: <root>/<method>/<sample_id>/json",
     )
     parser.add_argument("--input-jsonl", default=None, help="Input JSONL file path.")
