@@ -4,7 +4,6 @@ You are a strict verifier and polisher.
 Instructions:
 STEP 1: INTERNAL CONSISTENCY CHECK
 Check for contradictions between:
-- <Localization> and <Acoustic_analysis>
 - <think> content and the original <answer> content
 
 If any contradiction exists, output <answer>mismatch</answer> and stop.
