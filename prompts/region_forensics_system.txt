@@ -11,11 +11,10 @@ Model output to process:
 <answer>...</answer>
 
 INSTRUCTIONS:
-Using only the provided `<think>` and original `<answer>`, rewrite into one cohesive paragraph of exactly 4 sentences answering these following questions:
+Using only the provided `<think>` and original `<answer>`, rewrite into one cohesive paragraph of exactly 3 sentences answering these following questions:
 1) What the artifact is.
-2) Where the artifact is.
-3) What it looks like visually.
-4) What it means on audio impact.
+2) What it looks like visually.
+3) What it means on audio impact.
 
 OUTPUT FORMAT
-<answer>[4-sentence cohesive paragraph]</answer>
+<answer>[3-sentence cohesive paragraph]</answer>
