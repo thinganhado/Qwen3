@@ -4,6 +4,7 @@ import csv
 import json
 from collections import defaultdict
 from pathlib import Path
+from string import Formatter
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -37,7 +38,57 @@ def _resolve_user_template(args: argparse.Namespace) -> str:
 
 def _read_input_items(args: argparse.Namespace):
     items = []
-    if args.input_jsonl:
+    if args.input_qwen3_vl_root:
+        input_root = Path(args.input_qwen3_vl_root).expanduser().resolve()
+        if not input_root.exists():
+            raise FileNotFoundError(f"--input-qwen3-vl-root does not exist: {input_root}")
+
+        # Layout: <root>/<method>/<sample_id>/json
+        for json_path in sorted(input_root.glob("*/*/json")):
+            try:
+                payload = json.loads(json_path.read_text(encoding="utf-8"))
+            except Exception as e:
+                raise ValueError(f"Invalid grouped JSON file: {json_path}. Error: {e}") from e
+
+            sample_id = str(payload.get("sample_id", json_path.parent.name))
+            method_name = json_path.parent.parent.name
+            regions = payload.get("regions", [])
+            if not isinstance(regions, list):
+                continue
+
+            for region in regions:
+                if not isinstance(region, dict):
+                    continue
+
+                response_text = str(region.get("response", "")).strip()
+                if not response_text:
+                    continue
+
+                region_id = region.get("region_id", 0)
+                meta = {
+                    "sample_id": sample_id,
+                    "region_id": region_id,
+                    "crop_method": str(region.get("crop_method", method_name)),
+                    "time": str(region.get("time", "")),
+                    "frequency": str(region.get("frequency", "")),
+                    "phoneme": str(region.get("phoneme", "")),
+                    "feature": str(region.get("feature", "")),
+                }
+                items.append(
+                    {
+                        "sample_id": sample_id,
+                        "region_id": region_id,
+                        "method": method_name,
+                        "response": response_text,
+                        "description": response_text,
+                        "artifact_description": response_text,
+                        "metadata": meta,
+                        "metadata_json": json.dumps(meta, ensure_ascii=False),
+                        "input_text": response_text,
+                    }
+                )
+
+    elif args.input_jsonl:
         input_path = Path(args.input_jsonl).expanduser().resolve()
         if not input_path.exists():
             raise FileNotFoundError(f"--input-jsonl does not exist: {input_path}")
@@ -66,7 +117,7 @@ def _read_input_items(args: argparse.Namespace):
     elif args.prompt:
         items = [{"sample_id": "single", "region_id": 0, "input_text": args.prompt}]
     else:
-        raise ValueError("Provide one of --input-jsonl, --input-csv, or --prompt.")
+        raise ValueError("Provide one of --input-qwen3-vl-root, --input-jsonl, --input-csv, or --prompt.")
 
     if args.max_items is not None:
         items = items[: args.max_items]
@@ -90,9 +141,29 @@ def _read_input_items(args: argparse.Namespace):
 
 
 def _build_user_prompt(template: str, item: dict, user_field: str) -> str:
-    # Keep templating forgiving so new columns can be gradually added without breaking runs.
-    field_map = defaultdict(str, item)
-    prompt = template.format_map(field_map).strip()
+    # Support both named placeholders (e.g., {response}) and positional placeholders ({}).
+    has_positional = False
+    for _, field_name, _, _ in Formatter().parse(template):
+        if field_name == "":
+            has_positional = True
+            break
+
+    if has_positional:
+        prompt = template.format(
+            str(item.get("artifact_description", item.get(user_field, ""))),
+            str(item.get("metadata_json", "")),
+        ).strip()
+    else:
+        # Keep templating forgiving so new columns can be gradually added without breaking runs.
+        field_map = defaultdict(str, item)
+        if not field_map["description"]:
+            field_map["description"] = (
+                field_map["artifact_description"]
+                or field_map["response"]
+                or field_map[user_field]
+            )
+        prompt = template.format_map(field_map).strip()
+
     if prompt:
         return prompt
     return str(item.get(user_field, "")).strip()
@@ -124,6 +195,11 @@ def parse_args():
         help="HF model id or local model path.",
     )
 
+    parser.add_argument(
+        "--input-qwen3-vl-root",
+        default=None,
+        help="Root folder containing Qwen3-VL grouped outputs: <root>/<method>/<sample_id>/json",
+    )
     parser.add_argument("--input-jsonl", default=None, help="Input JSONL file path.")
     parser.add_argument("--input-csv", default=None, help="Input CSV file path.")
     parser.add_argument(
