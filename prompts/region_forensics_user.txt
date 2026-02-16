@@ -2,6 +2,6 @@ This is an artifact description for a spectrogram region.
 {description}
 
 Ground-truth metadata for checking:
-<META {metadata}/>
+{metadata_xml}
 
 Please strictly follow the instructions to polish it

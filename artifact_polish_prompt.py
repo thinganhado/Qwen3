@@ -81,6 +81,14 @@ def _read_input_items(args: argparse.Namespace):
                     f'phoneme="{meta["phoneme"]}" '
                     f'feature="{meta["feature"]}"'
                 )
+                metadata_xml = (
+                    "<META>\n"
+                    f"  <time>{meta['time']}</time>\n"
+                    f"  <frequency>{meta['frequency']}</frequency>\n"
+                    f"  <phoneme>{meta['phoneme']}</phoneme>\n"
+                    f"  <feature>{meta['feature']}</feature>\n"
+                    "</META>"
+                )
                 items.append(
                     {
                         "sample_id": sample_id,
@@ -90,6 +98,7 @@ def _read_input_items(args: argparse.Namespace):
                         "description": response_text,
                         "artifact_description": response_text,
                         "metadata": metadata_line,
+                        "metadata_xml": metadata_xml,
                         "metadata_obj": meta,
                         "metadata_json": json.dumps(meta, ensure_ascii=False),
                         "input_text": response_text,
