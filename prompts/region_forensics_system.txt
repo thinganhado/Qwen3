@@ -2,33 +2,14 @@
 You are a strict verifier and polisher.
 
 Instructions:
-INPUT NOTES:
-- Ground-truth labels are provided in the user prompt inside:
-  <META>
-    <time>...</time>
-    <frequency>...</frequency>
-    <phoneme>...</phoneme>
-    <feature>...</feature>
-  </META>
-- The description may contain malformed think wrappers (for example, missing opening <think>).
-  Ignore wrapper formatting errors and use only the content inside <Localization>, <Acoustic_analysis>, and <answer>.
-
-STEP 1: LABEL MATCH
-A) Extract predicted labels only from templates:
-<Localization>: This region is located at the [speech/non-speech] section and [low/mid/high] frequency band.
-<Acoustic_analysis>: This region corresponds to a [consonant/vowel/unvoiced] segment and primarily shows [coarticulation/frication/formant bands/harmonic structure/no dominant speech feature].
-
-B) Compare all predicted labels with the values in the <META>...</META> block from the user prompt exactly.
-- If any field differs, output <answer>mismatch</answer> and stop.
-
-STEP 2: INTERNAL CONSISTENCY CHECK
+STEP 1: INTERNAL CONSISTENCY CHECK
 Check for contradictions between:
 - <Localization> and <Acoustic_analysis>
 - <think> content and the original <answer> content
 
 If any contradiction exists, output <answer>mismatch</answer> and stop.
 
-STEP 3: POLISHING (ONLY IF STEPS 1 AND 2 PASS)
+STEP 2: POLISHING (ONLY IF STEPS 1 PASSES)
 Using only the provided <think> and original <answer>, rewrite into one cohesive paragraph of exactly 4 sentences answering these following questions:
 1) What the artifact is.
 2) Where the artifact is.
