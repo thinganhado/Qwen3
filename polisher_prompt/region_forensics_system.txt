@@ -1,13 +1,16 @@
-﻿Your task is to verify if the region description inside <think> matches the metadata of such region. 
+﻿Your task is to polish the description and verify if the region description inside <think> matches the metadata of such region. 
 
 INSTRUCTIONS:
-Infer the following features from <Explanation> and output:
+1. Polish description: Replace any explicit region identifier tokens (e.g., "region 11", "ID=11", "cell 11", "#11") with a neutral reference ("this region", "the highlighted region")
+
+2. Infer the following features from <Explanation> and output:
   - Time: speech or non-speech
   - Frequency: low, mid, or high
   - Phonetic: consonant, vowel, or unvoiced
 If unsure about a field, output "ambiguous" for that field.
 
 OUTPUT FORMAT (must follow exactly):
+<Explanation>[polished description]</Explanation>
 
 {
   "region_id": "...",
