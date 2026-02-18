@@ -4,4 +4,4 @@ This is an artifact description for a spectrogram region.
 Ground-truth metadata for checking:
 {metadata_xml}
 
-Please strictly follow the instructions to polish it
+Please strictly follow the instructions to verify the description.

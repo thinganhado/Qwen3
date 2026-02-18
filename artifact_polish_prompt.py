@@ -1,19 +1,20 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 import argparse
 import csv
 import json
+import re
 from collections import defaultdict
 from pathlib import Path
-from string import Formatter
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 THIS_DIR = Path(__file__).resolve().parent
-DEFAULT_SYSTEM_FILE = THIS_DIR / "prompts" / "region_forensics_system.txt"
-DEFAULT_USER_TEMPLATE_FILE = THIS_DIR / "prompts" / "region_forensics_user.txt"
-DEFAULT_INPUT_QWEN3_VL_ROOT = Path("/scratch3/che489/Ha/interspeech/localization/qwen3_vlm")
+DEFAULT_SYSTEM_FILE = THIS_DIR / "polisher_prompt" / "region_forensics_system.txt"
+DEFAULT_USER_TEMPLATE_FILE = THIS_DIR / "polisher_prompt" / "region_forensics_user.txt"
+DEFAULT_INPUT_QWEN3_VL_ROOT = Path("/scratch3/che489/Ha/interspeech/VLM/Qwen3-VL/outputs")
+DEFAULT_GT_CSV = Path("/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/img/region_phone_table_grid.csv")
 DEFAULT_OUTPUT_DIR = Path("/scratch3/che489/Ha/interspeech/localization/qwen3_polished")
 DEFAULT_MODEL_ID = "/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/LLM/Qwen3-Next-80B-A3B-Instruct/"
 
@@ -37,104 +38,155 @@ def _resolve_user_template(args: argparse.Namespace) -> str:
     return _load_text_file(Path(args.user_template_file), "--user-template-file")
 
 
-def _read_input_items(args: argparse.Namespace):
-    items = []
-    if args.input_qwen3_vl_root:
-        input_root = Path(args.input_qwen3_vl_root).expanduser().resolve()
-        if not input_root.exists():
-            raise FileNotFoundError(f"--input-qwen3-vl-root does not exist: {input_root}")
+def _normalize_method(method: str) -> str:
+    m = str(method or "").strip().lower()
+    if m in {"", "grid"}:
+        return "grid"
+    return m
 
-        # Layout: <root>/<method>/<sample_id>/json
-        for json_path in sorted(input_root.glob("*/*/json")):
+
+def _extract_explanation_and_answer(response_text: str) -> tuple[str, str]:
+    explanation = ""
+    answer = ""
+
+    m_exp = re.search(r"<Explanation>\s*(.*?)\s*</Explanation>", response_text, flags=re.IGNORECASE | re.DOTALL)
+    if m_exp:
+        explanation = m_exp.group(1).strip()
+
+    m_ans = re.search(r"<answer>\s*(.*?)\s*</answer>", response_text, flags=re.IGNORECASE | re.DOTALL)
+    if m_ans:
+        answer = m_ans.group(1).strip()
+
+    return explanation, answer
+
+
+def _build_metadata_xml(gt_row: dict | None, sample_id: str, region_id: int, method: str) -> tuple[str, dict]:
+    if gt_row is None:
+        meta = {
+            "sample_id": sample_id,
+            "method": method,
+            "region_id": region_id,
+            "time": "",
+            "frequency": "",
+            "phoneme": "",
+        }
+    else:
+        meta = {
+            "sample_id": sample_id,
+            "method": method,
+            "region_id": region_id,
+            "time": str(gt_row.get("T", "")).strip(),
+            "frequency": str(gt_row.get("F", "")).strip(),
+            "phoneme": str(gt_row.get("P_type", "")).strip(),
+        }
+
+    metadata_xml = (
+        "<META>\n"
+        f"  <sample_id>{meta['sample_id']}</sample_id>\n"
+        f"  <method>{meta['method']}</method>\n"
+        f"  <region_id>{meta['region_id']}</region_id>\n"
+        f"  <time>{meta['time']}</time>\n"
+        f"  <frequency>{meta['frequency']}</frequency>\n"
+        f"  <phoneme>{meta['phoneme']}</phoneme>\n"
+        "</META>"
+    )
+    return metadata_xml, meta
+
+
+def _load_gt_index(gt_csv_path: Path) -> tuple[dict, dict]:
+    by_full_key = {}
+    by_sample_region = {}
+    if not gt_csv_path.exists():
+        raise FileNotFoundError(f"--gt-csv does not exist: {gt_csv_path}")
+
+    with gt_csv_path.open("r", encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            sample_id = str(row.get("sample_id", "")).strip()
+            method = _normalize_method(row.get("method", "grid"))
+            rid_raw = str(row.get("region_id", "")).strip()
+            if not sample_id or not rid_raw:
+                continue
             try:
-                payload = json.loads(json_path.read_text(encoding="utf-8"))
-            except Exception as e:
-                raise ValueError(f"Invalid grouped JSON file: {json_path}. Error: {e}") from e
-
-            sample_id = str(payload.get("sample_id", json_path.parent.name))
-            method_name = json_path.parent.parent.name
-            regions = payload.get("regions", [])
-            if not isinstance(regions, list):
+                rid = int(rid_raw)
+            except Exception:
                 continue
 
-            for region in regions:
-                if not isinstance(region, dict):
-                    continue
+            by_full_key[(sample_id, method, rid)] = row
+            by_sample_region[(sample_id, rid)] = row
 
-                response_text = str(region.get("response", "")).strip()
-                if not response_text:
-                    continue
+    return by_full_key, by_sample_region
 
-                region_id = region.get("region_id", 0)
-                meta = {
+
+def _read_input_items(args: argparse.Namespace):
+    items = []
+    input_root = Path(args.input_qwen3_vl_root).expanduser().resolve()
+    if not input_root.exists():
+        raise FileNotFoundError(f"--input-qwen3-vl-root does not exist: {input_root}")
+
+    gt_csv_path = Path(args.gt_csv).expanduser().resolve()
+    gt_by_full_key, gt_by_sample_region = _load_gt_index(gt_csv_path)
+
+    # Layout: <root>/<method>/<sample_id>/json
+    for json_path in sorted(input_root.glob("*/*/json")):
+        try:
+            payload = json.loads(json_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            raise ValueError(f"Invalid grouped JSON file: {json_path}. Error: {e}") from e
+
+        sample_id = str(payload.get("sample_id", json_path.parent.name)).strip()
+        method_name = _normalize_method(json_path.parent.parent.name)
+        regions = payload.get("regions", [])
+        if not isinstance(regions, list):
+            continue
+
+        for region in regions:
+            if not isinstance(region, dict):
+                continue
+
+            response_text = str(region.get("response", "")).strip()
+            if not response_text:
+                continue
+
+            try:
+                region_id = int(region.get("region_id", 0))
+            except Exception:
+                continue
+
+            gt_row = gt_by_full_key.get((sample_id, method_name, region_id))
+            if gt_row is None:
+                gt_row = gt_by_sample_region.get((sample_id, region_id))
+
+            metadata_xml, _ = _build_metadata_xml(
+                gt_row=gt_row,
+                sample_id=sample_id,
+                region_id=region_id,
+                method=method_name,
+            )
+
+            explanation, answer = _extract_explanation_and_answer(response_text)
+            if explanation:
+                description = (
+                    f"Region ID: {region_id}\n"
+                    f"Explanation: {explanation}\n"
+                    f"Answer: {answer}"
+                )
+            else:
+                description = (
+                    f"Region ID: {region_id}\n"
+                    f"Response: {response_text}\n"
+                    f"Answer: {answer}"
+                )
+
+            items.append(
+                {
                     "sample_id": sample_id,
                     "region_id": region_id,
-                    "crop_method": str(region.get("crop_method", method_name)),
-                    "time": str(region.get("time", "")),
-                    "frequency": str(region.get("frequency", "")),
-                    "phoneme": str(region.get("phoneme", "")),
-                    "feature": str(region.get("feature", "")),
+                    "description": description,
+                    "metadata_xml": metadata_xml,
+                    "source_response": response_text,
                 }
-                metadata_line = (
-                    f'time="{meta["time"]}" '
-                    f'frequency="{meta["frequency"]}" '
-                    f'phoneme="{meta["phoneme"]}" '
-                    f'feature="{meta["feature"]}"'
-                )
-                metadata_xml = (
-                    "<META>\n"
-                    f"  <time>{meta['time']}</time>\n"
-                    f"  <frequency>{meta['frequency']}</frequency>\n"
-                    f"  <phoneme>{meta['phoneme']}</phoneme>\n"
-                    f"  <feature>{meta['feature']}</feature>\n"
-                    "</META>"
-                )
-                items.append(
-                    {
-                        "sample_id": sample_id,
-                        "region_id": region_id,
-                        "method": method_name,
-                        "response": response_text,
-                        "description": response_text,
-                        "artifact_description": response_text,
-                        "metadata": metadata_line,
-                        "metadata_xml": metadata_xml,
-                        "metadata_obj": meta,
-                        "metadata_json": json.dumps(meta, ensure_ascii=False),
-                        "input_text": response_text,
-                    }
-                )
-
-    elif args.input_jsonl:
-        input_path = Path(args.input_jsonl).expanduser().resolve()
-        if not input_path.exists():
-            raise FileNotFoundError(f"--input-jsonl does not exist: {input_path}")
-        with input_path.open("r", encoding="utf-8") as f:
-            for lineno, line in enumerate(f, start=1):
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    obj = json.loads(line)
-                except json.JSONDecodeError as e:
-                    raise ValueError(f"Invalid JSONL at line {lineno}: {e}") from e
-                if not isinstance(obj, dict):
-                    raise ValueError(f"Line {lineno} must be a JSON object")
-                items.append(obj)
-
-    elif args.input_csv:
-        input_path = Path(args.input_csv).expanduser().resolve()
-        if not input_path.exists():
-            raise FileNotFoundError(f"--input-csv does not exist: {input_path}")
-        with input_path.open("r", encoding="utf-8", newline="") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                items.append(dict(row))
-
-    elif args.prompt:
-        items = [{"sample_id": "single", "region_id": 0, "input_text": args.prompt}]
-    else:
-        raise ValueError("Provide one of --input-qwen3-vl-root, --input-jsonl, --input-csv, or --prompt.")
+            )
 
     if args.max_items is not None:
         items = items[: args.max_items]
@@ -157,43 +209,20 @@ def _read_input_items(args: argparse.Namespace):
     return normalized
 
 
-def _build_user_prompt(template: str, item: dict, user_field: str) -> str:
-    # Support both named placeholders (e.g., {response}) and positional placeholders ({}).
-    has_positional = False
-    for _, field_name, _, _ in Formatter().parse(template):
-        if field_name == "":
-            has_positional = True
-            break
-
-    if has_positional:
-        prompt = template.format(
-            str(item.get("artifact_description", item.get(user_field, ""))),
-            str(item.get("metadata_json", "")),
-        ).strip()
-    else:
-        # Keep templating forgiving so new columns can be gradually added without breaking runs.
-        field_map = defaultdict(str, item)
-        if not field_map["description"]:
-            field_map["description"] = (
-                field_map["artifact_description"]
-                or field_map["response"]
-                or field_map[user_field]
-            )
-        prompt = template.format_map(field_map).strip()
-
-    if prompt:
-        return prompt
-    return str(item.get(user_field, "")).strip()
+def _build_user_prompt(template: str, item: dict) -> str:
+    prompt = template.format(
+        description=str(item.get("description", "")),
+        metadata_xml=str(item.get("metadata_xml", "")),
+    ).strip()
+    if not prompt:
+        raise ValueError("User template rendered empty text.")
+    return prompt
 
 
 def build_messages(args: argparse.Namespace, item: dict):
     system_prompt = _resolve_system_prompt(args)
     user_template = _resolve_user_template(args)
-    user_prompt = _build_user_prompt(user_template, item, args.user_field)
-    if not user_prompt:
-        raise ValueError(
-            f"Empty user prompt for sample_id={item['sample_id']} region_id={item['region_id']}"
-        )
+    user_prompt = _build_user_prompt(user_template, item)
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -217,18 +246,7 @@ def parse_args():
         default=str(DEFAULT_INPUT_QWEN3_VL_ROOT),
         help="Root folder containing Qwen3-VL grouped outputs: <root>/<method>/<sample_id>/json",
     )
-    parser.add_argument("--input-jsonl", default=None, help="Input JSONL file path.")
-    parser.add_argument("--input-csv", default=None, help="Input CSV file path.")
-    parser.add_argument(
-        "--prompt",
-        default=None,
-        help="Single prompt input (quick test path).",
-    )
-    parser.add_argument(
-        "--user-field",
-        default="input_text",
-        help="Field name used when template renders empty.",
-    )
+    parser.add_argument("--gt-csv", default=str(DEFAULT_GT_CSV), help="GT CSV with sample_id/method/region_id/T/F/P_type.")
     parser.add_argument("--max-items", type=int, default=None, help="Optional cap for discovered items.")
     parser.add_argument("--num-shards", type=int, default=1, help="Split discovered items across N shards.")
     parser.add_argument("--shard-id", type=int, default=0, help="Shard index in [0, num_shards).")
@@ -480,9 +498,11 @@ def main():
                 record = {
                     "sample_id": item["sample_id"],
                     "region_id": item["region_id"],
+                    "description": item["description"],
+                    "metadata_xml": item["metadata_xml"],
+                    "source_response": item["source_response"],
                     "prompt": user_prompt,
                     "response": output_text,
-                    "input": item,
                 }
                 records_by_sample[record["sample_id"]].append(record)
 
