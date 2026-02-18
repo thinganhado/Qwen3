@@ -13,7 +13,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 THIS_DIR = Path(__file__).resolve().parent
 DEFAULT_SYSTEM_FILE = THIS_DIR / "polisher_prompt" / "region_forensics_system.txt"
 DEFAULT_USER_TEMPLATE_FILE = THIS_DIR / "polisher_prompt" / "region_forensics_user.txt"
-DEFAULT_INPUT_QWEN3_VL_ROOT = Path("/scratch3/che489/Ha/interspeech/VLM/Qwen3-VL/outputs")
+DEFAULT_INPUT_QWEN3_VL_ROOT = Path("/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/En/recovered_by_region_all_shards/")
 DEFAULT_GT_CSV = Path("/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/img/region_phone_table_grid.csv")
 DEFAULT_OUTPUT_DIR = Path("/scratch3/che489/Ha/interspeech/localization/qwen3_polished")
 DEFAULT_MODEL_ID = "/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/LLM/Qwen3-30B-A3B-Instruct-2507/"
@@ -90,57 +90,49 @@ def _read_input_items(args: argparse.Namespace):
     gt_csv_path = Path(args.gt_csv).expanduser().resolve()
     gt_by_full_key, gt_by_sample_region = _load_gt_index(gt_csv_path)
 
-    # Layout: <root>/<method>/<sample_id>/json
-    for json_path in sorted(input_root.glob("*/*/json")):
+    # Layout: <root>/<sample_id>/<region_id>.json
+    for json_path in sorted(input_root.glob("*/*.json")):
         try:
             payload = json.loads(json_path.read_text(encoding="utf-8"))
         except Exception as e:
-            raise ValueError(f"Invalid grouped JSON file: {json_path}. Error: {e}") from e
+            raise ValueError(f"Invalid per-region JSON file: {json_path}. Error: {e}") from e
 
         sample_id = str(payload.get("sample_id", json_path.parent.name)).strip()
-        method_name = _normalize_method(json_path.parent.parent.name)
-        regions = payload.get("regions", [])
-        if not isinstance(regions, list):
+        method_name = _normalize_method(payload.get("crop_method", "grid"))
+        response_text = str(payload.get("response", "")).strip()
+        if not response_text:
             continue
 
-        for region in regions:
-            if not isinstance(region, dict):
-                continue
+        try:
+            region_id = int(payload.get("region_id", Path(json_path).stem))
+        except Exception:
+            continue
 
-            response_text = str(region.get("response", "")).strip()
-            if not response_text:
-                continue
+        gt_row = gt_by_full_key.get((sample_id, method_name, region_id))
+        if gt_row is None:
+            gt_row = gt_by_sample_region.get((sample_id, region_id))
+        if gt_row is None:
+            continue
 
-            try:
-                region_id = int(region.get("region_id", 0))
-            except Exception:
-                continue
+        # Force region_id from GT CSV.
+        try:
+            region_id_csv = int(str(gt_row.get("region_id", "")).strip())
+        except Exception:
+            continue
 
-            gt_row = gt_by_full_key.get((sample_id, method_name, region_id))
-            if gt_row is None:
-                gt_row = gt_by_sample_region.get((sample_id, region_id))
-            if gt_row is None:
-                continue
+        explanation_block = _extract_explanation_block(response_text)
+        if not explanation_block:
+            continue
 
-            # Force region_id from GT CSV.
-            try:
-                region_id_csv = int(str(gt_row.get("region_id", "")).strip())
-            except Exception:
-                continue
+        description = f"Region ID: {region_id_csv}\n{explanation_block}"
 
-            explanation_block = _extract_explanation_block(response_text)
-            if not explanation_block:
-                continue
-
-            description = f"Region ID: {region_id_csv}\n{explanation_block}"
-
-            items.append(
-                    {
-                        "sample_id": sample_id,
-                        "region_id": region_id_csv,
-                        "description": description,
-                    }
-                )
+        items.append(
+                {
+                    "sample_id": sample_id,
+                    "region_id": region_id_csv,
+                    "description": description,
+                }
+            )
 
     if args.max_items is not None:
         items = items[: args.max_items]
@@ -197,7 +189,7 @@ def parse_args():
     parser.add_argument(
         "--input-qwen3-vl-root",
         default=str(DEFAULT_INPUT_QWEN3_VL_ROOT),
-        help="Root folder containing Qwen3-VL grouped outputs: <root>/<method>/<sample_id>/json",
+        help="Root folder containing per-region JSONs: <root>/<sample_id>/<region_id>.json",
     )
     parser.add_argument("--gt-csv", default=str(DEFAULT_GT_CSV), help="GT CSV with sample_id/method/region_id.")
     parser.add_argument("--max-items", type=int, default=None, help="Optional cap for discovered items.")
