@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=128G
 #SBATCH --time=48:00:00
-#SBATCH --output=logs/qwen_region_full_%j.out
+#SBATCH --output=logs/qwen_region_full_%A_%a.out
 #SBATCH --account=OD-237777
 #SBATCH --gres=gpu:1
 
@@ -33,10 +33,11 @@ fi
 mkdir -p "${SCRIPT_DIR}/logs"
 cd "${SCRIPT_DIR}"
 
-MODEL_ID="${MODEL_ID:-Qwen/Qwen3-8B-Instruct-2507}"
-INPUT_JSONL="${INPUT_JSONL:-${SCRIPT_DIR}/inputs/region_inputs.example.jsonl}"
-SYSTEM_FILE="${SYSTEM_FILE:-${SCRIPT_DIR}/prompts/region_forensics_system.txt}"
-USER_TEMPLATE_FILE="${USER_TEMPLATE_FILE:-${SCRIPT_DIR}/prompts/region_forensics_user.txt}"
+MODEL_ID="${MODEL_ID:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/LLM/Qwen3-Next-80B-A3B-Instruct/}"
+INPUT_QWEN3_VL_ROOT="${INPUT_QWEN3_VL_ROOT:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/En/recovered_by_region_all_shards/}"
+GT_CSV="${GT_CSV:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/img/region_phone_table_grid.csv}"
+SYSTEM_FILE="${SYSTEM_FILE:-${SCRIPT_DIR}/polisher_prompt/region_forensics_system.txt}"
+USER_TEMPLATE_FILE="${USER_TEMPLATE_FILE:-${SCRIPT_DIR}/polisher_prompt/region_forensics_user.txt}"
 OUTPUT_BASE_DIR="${OUTPUT_BASE_DIR:-${SCRIPT_DIR}/outputs/qwen3_text}"
 SHARD_COUNT="${SHARD_COUNT:-1}"
 SHARD_ID="${SHARD_ID:-${SLURM_ARRAY_TASK_ID:-0}}"
@@ -57,7 +58,8 @@ TOP_K="${TOP_K:-20}"
 
 echo "[run] SCRIPT_DIR=${SCRIPT_DIR}"
 echo "[run] MODEL_ID=${MODEL_ID}"
-echo "[run] INPUT_JSONL=${INPUT_JSONL}"
+echo "[run] INPUT_QWEN3_VL_ROOT=${INPUT_QWEN3_VL_ROOT}"
+echo "[run] GT_CSV=${GT_CSV}"
 echo "[run] OUTPUT_DIR=${OUTPUT_DIR}"
 echo "[run] SHARD_ID=${SHARD_ID} SHARD_COUNT=${SHARD_COUNT}"
 echo "[run] BATCH_SIZE=${BATCH_SIZE}"
@@ -67,9 +69,10 @@ if [[ "${DO_SAMPLE}" == "1" ]]; then
   EXTRA_ARGS+=(--do-sample)
 fi
 
-python "${SCRIPT_DIR}/qwen_region_artifact_prompt.py" \
+python "${SCRIPT_DIR}/artifact_polish_prompt.py" \
   --model-id "${MODEL_ID}" \
-  --input-jsonl "${INPUT_JSONL}" \
+  --input-qwen3-vl-root "${INPUT_QWEN3_VL_ROOT}" \
+  --gt-csv "${GT_CSV}" \
   --system-file "${SYSTEM_FILE}" \
   --user-template-file "${USER_TEMPLATE_FILE}" \
   --dtype "${DTYPE}" \
