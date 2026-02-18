@@ -3,12 +3,12 @@
 #SBATCH --partition=h24gpu
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=16
 #SBATCH --mem=128G
-#SBATCH --time=48:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output=logs/qwen_region_full_%A_%a.out
 #SBATCH --account=OD-237777
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:4
 
 set -euo pipefail
 
