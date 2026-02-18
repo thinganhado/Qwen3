@@ -12,7 +12,7 @@ Infer the following features from <Explanation> and output:
 If unsure about a field, output "ambiguous" for that field.
 
 3. Verify against ground truth:
-Compare the extracted fields to the provided region metadata.
+Compare the extracted fields to the provided region metadata. If there is any mismtach, output "mismatch metadata".
 
 OUTPUT FORMAT (must follow exactly):
 {
