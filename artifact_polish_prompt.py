@@ -16,7 +16,7 @@ DEFAULT_USER_TEMPLATE_FILE = THIS_DIR / "polisher_prompt" / "region_forensics_us
 DEFAULT_INPUT_QWEN3_VL_ROOT = Path("/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/En/recovered_by_region_all_shards/")
 DEFAULT_GT_CSV = Path("/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/img/region_phone_table_grid.csv")
 DEFAULT_OUTPUT_DIR = Path("/scratch3/che489/Ha/interspeech/localization/qwen3_polished")
-DEFAULT_MODEL_ID = "/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/LLM/Qwen3-30B-A3B-Instruct-2507/"
+DEFAULT_MODEL_ID = "/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/LLM/Qwen3-Next-80B-A3B-Instruct/"
 
 
 def _load_text_file(path: Path, field_name: str) -> str:
