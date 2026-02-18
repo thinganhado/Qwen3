@@ -16,7 +16,7 @@ DEFAULT_USER_TEMPLATE_FILE = THIS_DIR / "polisher_prompt" / "region_forensics_us
 DEFAULT_INPUT_QWEN3_VL_ROOT = Path("/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/En/recovered_by_region_all_shards/")
 DEFAULT_GT_CSV = Path("/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/img/region_phone_table_grid.csv")
 DEFAULT_OUTPUT_DIR = Path("/scratch3/che489/Ha/interspeech/localization/qwen3_polished")
-DEFAULT_MODEL_ID = "/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/LLM/Qwen3-Next-80B-A3B-Instruct/"
+DEFAULT_MODEL_ID = "/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/polisher/Qwen3-4B-Instruct-2507/"
 
 
 def _load_text_file(path: Path, field_name: str) -> str:
@@ -54,6 +54,53 @@ def _extract_explanation_block(response_text: str) -> str:
     if m_exp:
         return m_exp.group(1).strip()
     return ""
+
+
+def _extract_json_block(response_text: str) -> dict:
+    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", response_text, flags=re.IGNORECASE | re.DOTALL)
+    if fenced:
+        try:
+            obj = json.loads(fenced.group(1))
+            if isinstance(obj, dict):
+                return obj
+        except Exception:
+            pass
+
+    m_obj = re.search(r"(\{.*\})", response_text, flags=re.DOTALL)
+    if not m_obj:
+        return {}
+    try:
+        obj = json.loads(m_obj.group(1))
+        if isinstance(obj, dict):
+            return obj
+    except Exception:
+        return {}
+    return {}
+
+
+def _parse_model_output(response_text: str, expected_region_id: int) -> dict:
+    explanation = _extract_explanation_block(response_text)
+    parsed = _extract_json_block(response_text)
+
+    def _pick(*keys: str, default: str = "ambiguous") -> str:
+        for k in keys:
+            v = parsed.get(k)
+            if v is not None and str(v).strip():
+                return str(v).strip()
+        return default
+
+    region_id_val = _pick("region_id", default=str(expected_region_id))
+    structured = {
+        "region_id": str(region_id_val),
+        "time": _pick("time"),
+        "frequency": _pick("frequency"),
+        "phonetic": _pick("phonetic", "phoneme"),
+    }
+    return {
+        "output_explanation": explanation,
+        "output_structured": structured,
+        "output_raw": response_text,
+    }
 
 
 def _load_gt_index(gt_csv_path: Path) -> tuple[dict, dict]:
@@ -323,8 +370,24 @@ def _load_existing_records_by_sample(output_dir: Path) -> dict:
         if not sample_id or not isinstance(regions, list):
             continue
         for rec in regions:
-            if isinstance(rec, dict) and "region_id" in rec:
-                records_by_sample[str(sample_id)].append(rec)
+            if not isinstance(rec, dict) or "region_id" not in rec:
+                continue
+            try:
+                rid = int(rec.get("region_id"))
+            except Exception:
+                continue
+            raw = str(rec.get("output_raw", rec.get("response", ""))).strip()
+            parsed = _parse_model_output(raw, rid)
+            normalized = {
+                "sample_id": str(sample_id),
+                "region_id": rid,
+                "prompt": str(rec.get("prompt", "")),
+                "response": raw,
+                "output_raw": parsed["output_raw"],
+                "output_explanation": parsed["output_explanation"],
+                "output_structured": parsed["output_structured"],
+            }
+            records_by_sample[str(sample_id)].append(normalized)
     return records_by_sample
 
 
@@ -440,12 +503,15 @@ def main():
                 start=1,
             ):
                 idx = batch_start + i
+                parsed = _parse_model_output(output_text, int(item["region_id"]))
                 record = {
                     "sample_id": item["sample_id"],
                     "region_id": item["region_id"],
-                    "description": item["description"],
                     "prompt": user_prompt,
                     "response": output_text,
+                    "output_raw": parsed["output_raw"],
+                    "output_explanation": parsed["output_explanation"],
+                    "output_structured": parsed["output_structured"],
                 }
                 records_by_sample[record["sample_id"]].append(record)
 
