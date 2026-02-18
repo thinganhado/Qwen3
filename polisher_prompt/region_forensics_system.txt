@@ -1,20 +1,14 @@
-﻿Your task is to verify if the region description inside <think> matches the metadata of such region and if the localization in <answer> matches the described region. 
+﻿Your task is to verify if the region description inside <think> matches the metadata of such region. 
 
 INSTRUCTIONS:
-1. Verify localization:
-If the user message states an ID but the ID in <answer> is not the same, output "incorrect region".
-
-2. Extract Fields:
 Infer the following features from <Explanation> and output:
   - Time: speech or non-speech
   - Frequency: low, mid, or high
   - Phonetic: consonant, vowel, or unvoiced
 If unsure about a field, output "ambiguous" for that field.
 
-3. Verify against ground truth:
-Compare the extracted fields to the provided region metadata. If there is any mismtach, output "mismatch metadata".
-
 OUTPUT FORMAT (must follow exactly):
+
 {
   "region_id": "...",
   "time": "speech/non-speech/ambiguous",

@@ -1,7 +1,4 @@
 This is an artifact description for a spectrogram region. 
 {description}
 
-Ground-truth metadata for checking:
-{metadata_xml}
-
-Please strictly follow the instructions to verify the description.
+Please strictly follow the instructions to extract the information.

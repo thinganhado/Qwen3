@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 import argparse
 import csv
 import json
@@ -45,52 +45,15 @@ def _normalize_method(method: str) -> str:
     return m
 
 
-def _extract_explanation_and_answer(response_text: str) -> tuple[str, str]:
-    explanation = ""
-    answer = ""
-
-    m_exp = re.search(r"<Explanation>\s*(.*?)\s*</Explanation>", response_text, flags=re.IGNORECASE | re.DOTALL)
-    if m_exp:
-        explanation = m_exp.group(1).strip()
-
-    m_ans = re.search(r"<answer>\s*(.*?)\s*</answer>", response_text, flags=re.IGNORECASE | re.DOTALL)
-    if m_ans:
-        answer = m_ans.group(1).strip()
-
-    return explanation, answer
-
-
-def _build_metadata_xml(gt_row: dict | None, sample_id: str, region_id: int, method: str) -> tuple[str, dict]:
-    if gt_row is None:
-        meta = {
-            "sample_id": sample_id,
-            "method": method,
-            "region_id": region_id,
-            "time": "",
-            "frequency": "",
-            "phoneme": "",
-        }
-    else:
-        meta = {
-            "sample_id": sample_id,
-            "method": method,
-            "region_id": region_id,
-            "time": str(gt_row.get("T", "")).strip(),
-            "frequency": str(gt_row.get("F", "")).strip(),
-            "phoneme": str(gt_row.get("P_type", "")).strip(),
-        }
-
-    metadata_xml = (
-        "<META>\n"
-        f"  <sample_id>{meta['sample_id']}</sample_id>\n"
-        f"  <method>{meta['method']}</method>\n"
-        f"  <region_id>{meta['region_id']}</region_id>\n"
-        f"  <time>{meta['time']}</time>\n"
-        f"  <frequency>{meta['frequency']}</frequency>\n"
-        f"  <phoneme>{meta['phoneme']}</phoneme>\n"
-        "</META>"
+def _extract_explanation_block(response_text: str) -> str:
+    m_exp = re.search(
+        r"(<Explanation>\s*.*?\s*</Explanation>)",
+        response_text,
+        flags=re.IGNORECASE | re.DOTALL,
     )
-    return metadata_xml, meta
+    if m_exp:
+        return m_exp.group(1).strip()
+    return ""
 
 
 def _load_gt_index(gt_csv_path: Path) -> tuple[dict, dict]:
@@ -156,37 +119,28 @@ def _read_input_items(args: argparse.Namespace):
             gt_row = gt_by_full_key.get((sample_id, method_name, region_id))
             if gt_row is None:
                 gt_row = gt_by_sample_region.get((sample_id, region_id))
+            if gt_row is None:
+                continue
 
-            metadata_xml, _ = _build_metadata_xml(
-                gt_row=gt_row,
-                sample_id=sample_id,
-                region_id=region_id,
-                method=method_name,
-            )
+            # Force region_id from GT CSV.
+            try:
+                region_id_csv = int(str(gt_row.get("region_id", "")).strip())
+            except Exception:
+                continue
 
-            explanation, answer = _extract_explanation_and_answer(response_text)
-            if explanation:
-                description = (
-                    f"Region ID: {region_id}\n"
-                    f"Explanation: {explanation}\n"
-                    f"Answer: {answer}"
-                )
-            else:
-                description = (
-                    f"Region ID: {region_id}\n"
-                    f"Response: {response_text}\n"
-                    f"Answer: {answer}"
-                )
+            explanation_block = _extract_explanation_block(response_text)
+            if not explanation_block:
+                continue
+
+            description = f"Region ID: {region_id_csv}\n{explanation_block}"
 
             items.append(
-                {
-                    "sample_id": sample_id,
-                    "region_id": region_id,
-                    "description": description,
-                    "metadata_xml": metadata_xml,
-                    "source_response": response_text,
-                }
-            )
+                    {
+                        "sample_id": sample_id,
+                        "region_id": region_id_csv,
+                        "description": description,
+                    }
+                )
 
     if args.max_items is not None:
         items = items[: args.max_items]
@@ -212,7 +166,6 @@ def _read_input_items(args: argparse.Namespace):
 def _build_user_prompt(template: str, item: dict) -> str:
     prompt = template.format(
         description=str(item.get("description", "")),
-        metadata_xml=str(item.get("metadata_xml", "")),
     ).strip()
     if not prompt:
         raise ValueError("User template rendered empty text.")
@@ -246,7 +199,7 @@ def parse_args():
         default=str(DEFAULT_INPUT_QWEN3_VL_ROOT),
         help="Root folder containing Qwen3-VL grouped outputs: <root>/<method>/<sample_id>/json",
     )
-    parser.add_argument("--gt-csv", default=str(DEFAULT_GT_CSV), help="GT CSV with sample_id/method/region_id/T/F/P_type.")
+    parser.add_argument("--gt-csv", default=str(DEFAULT_GT_CSV), help="GT CSV with sample_id/method/region_id.")
     parser.add_argument("--max-items", type=int, default=None, help="Optional cap for discovered items.")
     parser.add_argument("--num-shards", type=int, default=1, help="Split discovered items across N shards.")
     parser.add_argument("--shard-id", type=int, default=0, help="Shard index in [0, num_shards).")
@@ -499,8 +452,6 @@ def main():
                     "sample_id": item["sample_id"],
                     "region_id": item["region_id"],
                     "description": item["description"],
-                    "metadata_xml": item["metadata_xml"],
-                    "source_response": item["source_response"],
                     "prompt": user_prompt,
                     "response": output_text,
                 }
