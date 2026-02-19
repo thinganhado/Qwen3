@@ -3,7 +3,7 @@
 #SBATCH --partition=h24gpu
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=32
 #SBATCH --mem=128G
 #SBATCH --time=24:00:00
 #SBATCH --output=logs/qwen_region_full_%A_%a.out
@@ -50,7 +50,7 @@ else
 fi
 MAX_NEW_TOKENS="${MAX_NEW_TOKENS:-600}"
 DTYPE="${DTYPE:-auto}"
-BATCH_SIZE="${BATCH_SIZE:-1}"
+BATCH_SIZE="2"
 DO_SAMPLE="${DO_SAMPLE:-0}"
 TEMPERATURE="${TEMPERATURE:-0.7}"
 TOP_P="${TOP_P:-0.9}"
