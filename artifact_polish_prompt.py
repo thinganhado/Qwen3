@@ -15,7 +15,7 @@ DEFAULT_SYSTEM_FILE = THIS_DIR / "polisher_prompt" / "region_forensics_system.tx
 DEFAULT_USER_TEMPLATE_FILE = THIS_DIR / "polisher_prompt" / "region_forensics_user.txt"
 DEFAULT_INPUT_QWEN3_VL_ROOT = Path("/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/En/captioner/")
 DEFAULT_GT_CSV = Path("/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/img/region_phone_table_grid.csv")
-DEFAULT_OUTPUT_DIR = Path("/scratch3/che489/Ha/interspeech/localization/qwen3_polished")
+DEFAULT_OUTPUT_DIR = Path("/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/En/polisher/")
 DEFAULT_MODEL_ID = "/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/polisher/Qwen3-4B-Instruct-2507/"
 
 
@@ -334,6 +334,8 @@ def _generate_batch(
 
 
 def _write_sample_grouped_json(output_dir: Path, records_by_sample: dict):
+    # Keep function name for compatibility, but write per-region files:
+    # <output_dir>/<sample_id>/<region_id>.json
     for sample_id, records in records_by_sample.items():
         sample_dir = output_dir / sample_id
         sample_dir.mkdir(parents=True, exist_ok=True)
@@ -344,15 +346,10 @@ def _write_sample_grouped_json(output_dir: Path, records_by_sample: dict):
             if rid is None:
                 continue
             by_region[int(rid)] = rec
-        records_sorted = [by_region[rid] for rid in sorted(by_region.keys())]
-        payload = {
-            "sample_id": sample_id,
-            "num_regions": len(records_sorted),
-            "regions": records_sorted,
-        }
 
-        out_file = sample_dir / "json"
-        out_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        for rid in sorted(by_region.keys()):
+            out_file = sample_dir / f"{rid}.json"
+            out_file.write_text(json.dumps(by_region[rid], ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _load_existing_records_by_sample(output_dir: Path) -> dict:
@@ -360,6 +357,32 @@ def _load_existing_records_by_sample(output_dir: Path) -> dict:
     if not output_dir.exists():
         return records_by_sample
 
+    # New structure: <output_dir>/<sample_id>/<region_id>.json
+    for p in output_dir.glob("*/*.json"):
+        try:
+            obj = json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        sample_id = str(obj.get("sample_id", p.parent.name))
+        try:
+            rid = int(obj.get("region_id", p.stem))
+        except Exception:
+            continue
+
+        raw = str(obj.get("output_raw", obj.get("response", ""))).strip()
+        parsed = _parse_model_output(raw, rid)
+        normalized = {
+            "sample_id": sample_id,
+            "region_id": rid,
+            "prompt": str(obj.get("prompt", "")),
+            "response": raw,
+            "output_raw": parsed["output_raw"],
+            "output_explanation": parsed["output_explanation"],
+            "output_structured": parsed["output_structured"],
+        }
+        records_by_sample[str(sample_id)].append(normalized)
+
+    # Backward compatibility: old grouped structure <output_dir>/<sample_id>/json
     for p in output_dir.glob("*/json"):
         try:
             obj = json.loads(p.read_text(encoding="utf-8"))

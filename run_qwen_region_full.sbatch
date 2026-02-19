@@ -34,11 +34,11 @@ mkdir -p "${SCRIPT_DIR}/logs"
 cd "${SCRIPT_DIR}"
 
 MODEL_ID="${MODEL_ID:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/polisher/Qwen3-4B-Instruct-2507/}"
-INPUT_QWEN3_VL_ROOT="${INPUT_QWEN3_VL_ROOT:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/En/recovered_by_region_all_shards/}"
+INPUT_QWEN3_VL_ROOT="${INPUT_QWEN3_VL_ROOT:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/En/captioner/}"
 GT_CSV="${GT_CSV:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/img/region_phone_table_grid.csv}"
 SYSTEM_FILE="${SYSTEM_FILE:-${SCRIPT_DIR}/polisher_prompt/region_forensics_system.txt}"
 USER_TEMPLATE_FILE="${USER_TEMPLATE_FILE:-${SCRIPT_DIR}/polisher_prompt/region_forensics_user.txt}"
-OUTPUT_BASE_DIR="${OUTPUT_BASE_DIR:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/En/polished/}"
+OUTPUT_BASE_DIR="${OUTPUT_BASE_DIR:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/En/polisher/}"
 SHARD_COUNT="${SHARD_COUNT:-1}"
 SHARD_ID="${SHARD_ID:-${SLURM_ARRAY_TASK_ID:-0}}"
 if [[ "${SHARD_COUNT}" -gt 1 ]]; then
