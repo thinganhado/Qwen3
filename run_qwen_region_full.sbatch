@@ -1,4 +1,4 @@
-#!/bin/bash -l
+﻿#!/bin/bash -l
 #SBATCH --job-name=qwen_region_full
 #SBATCH --partition=h24gpu
 #SBATCH --nodes=1
@@ -33,7 +33,7 @@ fi
 mkdir -p "${SCRIPT_DIR}/logs"
 cd "${SCRIPT_DIR}"
 
-MODEL_ID="${MODEL_ID:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/LLM/Qwen3-4B-Instruct-2507-4bit-GPTQ}"
+MODEL_ID="${MODEL_ID:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/LLM/Qwen3-4B-Instruct-2507}"
 INPUT_QWEN3_VL_ROOT="${INPUT_QWEN3_VL_ROOT:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/En/captioner/}"
 GT_CSV="${GT_CSV:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/img/region_phone_table_grid.csv}"
 SYSTEM_FILE="${SYSTEM_FILE:-${SCRIPT_DIR}/polisher_prompt/region_forensics_system.txt}"
@@ -87,3 +87,4 @@ python "${SCRIPT_DIR}/artifact_polish_prompt.py" \
   --output-jsonl "${OUTPUT_JSONL}" \
   "${EXTRA_ARGS[@]}" \
   "$@"
+
