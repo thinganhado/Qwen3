@@ -391,6 +391,33 @@ def _load_existing_records_by_sample(output_dir: Path) -> dict:
     return records_by_sample
 
 
+def _resume_scan_dirs(output_dir: Path, num_shards: int) -> list[Path]:
+    """
+    Return directories to scan for existing outputs in resume mode.
+    If output_dir is a shard path like shard_<id>_of_<N>, scan all sibling shards.
+    """
+    dirs = []
+
+    if output_dir.exists() and output_dir.is_dir():
+        dirs.append(output_dir)
+
+    m = re.match(r"^shard_\d+_of_(\d+)$", output_dir.name)
+    if m:
+        shard_count = int(m.group(1))
+        parent = output_dir.parent
+        for p in sorted(parent.glob(f"shard_*_of_{shard_count}")):
+            if p.is_dir() and p not in dirs:
+                dirs.append(p)
+        return dirs
+
+    if num_shards > 1 and output_dir.exists() and output_dir.is_dir():
+        for p in sorted(output_dir.glob(f"shard_*_of_{num_shards}")):
+            if p.is_dir() and p not in dirs:
+                dirs.append(p)
+
+    return dirs
+
+
 def _existing_done_keys(records_by_sample: dict) -> set:
     done = set()
     for sample_id, records in records_by_sample.items():
@@ -409,7 +436,16 @@ def main():
 
     existing_records = defaultdict(list)
     if not args.overwrite:
-        existing_records = _load_existing_records_by_sample(output_root)
+        scan_dirs = _resume_scan_dirs(output_root, args.num_shards)
+        if len(scan_dirs) == 0:
+            scan_dirs = [output_root]
+
+        print(f"[resume] scanning_existing_dirs={len(scan_dirs)}")
+        for d in scan_dirs:
+            loaded = _load_existing_records_by_sample(d)
+            for sid, recs in loaded.items():
+                existing_records[sid].extend(recs)
+
         done_keys = _existing_done_keys(existing_records)
         before = len(items)
         items = [
