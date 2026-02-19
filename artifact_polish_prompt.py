@@ -13,7 +13,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 THIS_DIR = Path(__file__).resolve().parent
 DEFAULT_SYSTEM_FILE = THIS_DIR / "polisher_prompt" / "region_forensics_system.txt"
 DEFAULT_USER_TEMPLATE_FILE = THIS_DIR / "polisher_prompt" / "region_forensics_user.txt"
-DEFAULT_INPUT_QWEN3_VL_ROOT = Path("/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/En/recovered_by_region_all_shards/")
+DEFAULT_INPUT_QWEN3_VL_ROOT = Path("/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/En/captioner/")
 DEFAULT_GT_CSV = Path("/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/img/region_phone_table_grid.csv")
 DEFAULT_OUTPUT_DIR = Path("/scratch3/che489/Ha/interspeech/localization/qwen3_polished")
 DEFAULT_MODEL_ID = "/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/polisher/Qwen3-4B-Instruct-2507/"
