@@ -1,4 +1,4 @@
-﻿#!/bin/bash -l
+#!/bin/bash -l
 #SBATCH --job-name=qwen_region_full
 #SBATCH --partition=h24gpu
 #SBATCH --nodes=1
@@ -17,6 +17,7 @@ if [ -f "$HOME/.bashrc" ]; then
 fi
 
 conda activate deepfake
+conda activate vllm
 
 if [[ -n "${SCRIPT_DIR_OVERRIDE:-}" ]]; then
   SCRIPT_DIR="${SCRIPT_DIR_OVERRIDE}"
@@ -33,9 +34,10 @@ fi
 mkdir -p "${SCRIPT_DIR}/logs"
 cd "${SCRIPT_DIR}"
 
-MODEL_ID="${MODEL_ID:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/LLM/Qwen3-4B-Instruct-2507}"
-INPUT_QWEN3_VL_ROOT="${INPUT_QWEN3_VL_ROOT:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/En/captioner/}"
-GT_CSV="${GT_CSV:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/img/region_phone_table_grid.csv}"
+MODEL_ID="${MODEL_ID:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/LLM/Qwen3-30B-A3B-Instruct-2507/}"
+INPUT_MODEL_FOLDER="${INPUT_MODEL_FOLDER:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/final__En/Qwen3-VL-30B-A3B-Thinking_}"
+INPUT_JSONL="${INPUT_JSONL:-}"
+GT_CSV="${GT_CSV:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/img/final_mask_topk/region_phone_table_topk3.csv}"
 SYSTEM_FILE="${SYSTEM_FILE:-${SCRIPT_DIR}/polisher_prompt/region_forensics_system.txt}"
 USER_TEMPLATE_FILE="${USER_TEMPLATE_FILE:-${SCRIPT_DIR}/polisher_prompt/region_forensics_user.txt}"
 OUTPUT_BASE_DIR="${OUTPUT_BASE_DIR:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/En/polisher/}"
@@ -50,28 +52,41 @@ else
 fi
 MAX_NEW_TOKENS="${MAX_NEW_TOKENS:-600}"
 DTYPE="${DTYPE:-auto}"
-BATCH_SIZE="2"
+BACKEND="${BACKEND:-vllm}"
+BATCH_SIZE="${BATCH_SIZE:-8}"
 DO_SAMPLE="${DO_SAMPLE:-0}"
 TEMPERATURE="${TEMPERATURE:-0.7}"
 TOP_P="${TOP_P:-0.9}"
 TOP_K="${TOP_K:-20}"
+TENSOR_PARALLEL_SIZE="${TENSOR_PARALLEL_SIZE:-4}"
+VLLM_GPU_MEMORY_UTILIZATION="${VLLM_GPU_MEMORY_UTILIZATION:-0.92}"
+VLLM_ENFORCE_EAGER="${VLLM_ENFORCE_EAGER:-0}"
 
 echo "[run] SCRIPT_DIR=${SCRIPT_DIR}"
 echo "[run] MODEL_ID=${MODEL_ID}"
-echo "[run] INPUT_QWEN3_VL_ROOT=${INPUT_QWEN3_VL_ROOT}"
+if [[ -z "${INPUT_JSONL:-}" ]]; then
+  INPUT_JSONL="${INPUT_MODEL_FOLDER%/}/qwen_region_outputs_shard_0_of_4.jsonl"
+fi
+echo "[run] INPUT_MODEL_FOLDER=${INPUT_MODEL_FOLDER}"
+echo "[run] INPUT_JSONL=${INPUT_JSONL}"
 echo "[run] GT_CSV=${GT_CSV}"
 echo "[run] OUTPUT_DIR=${OUTPUT_DIR}"
 echo "[run] SHARD_ID=${SHARD_ID} SHARD_COUNT=${SHARD_COUNT}"
 echo "[run] BATCH_SIZE=${BATCH_SIZE}"
+echo "[run] BACKEND=${BACKEND} TENSOR_PARALLEL_SIZE=${TENSOR_PARALLEL_SIZE}"
 
 EXTRA_ARGS=()
 if [[ "${DO_SAMPLE}" == "1" ]]; then
   EXTRA_ARGS+=(--do-sample)
 fi
+if [[ "${VLLM_ENFORCE_EAGER}" == "1" ]]; then
+  EXTRA_ARGS+=(--vllm-enforce-eager)
+fi
 
 python "${SCRIPT_DIR}/artifact_polish_prompt.py" \
+  --backend "${BACKEND}" \
   --model-id "${MODEL_ID}" \
-  --input-qwen3-vl-root "${INPUT_QWEN3_VL_ROOT}" \
+  --input-jsonl "${INPUT_JSONL}" \
   --gt-csv "${GT_CSV}" \
   --system-file "${SYSTEM_FILE}" \
   --user-template-file "${USER_TEMPLATE_FILE}" \
@@ -81,10 +96,13 @@ python "${SCRIPT_DIR}/artifact_polish_prompt.py" \
   --temperature "${TEMPERATURE}" \
   --top-p "${TOP_P}" \
   --top-k "${TOP_K}" \
+  --tensor-parallel-size "${TENSOR_PARALLEL_SIZE}" \
+  --vllm-gpu-memory-utilization "${VLLM_GPU_MEMORY_UTILIZATION}" \
   --num-shards "${SHARD_COUNT}" \
   --shard-id "${SHARD_ID}" \
   --output-dir "${OUTPUT_DIR}" \
   --output-jsonl "${OUTPUT_JSONL}" \
   "${EXTRA_ARGS[@]}" \
   "$@"
+
 

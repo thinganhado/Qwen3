@@ -1,7 +1,7 @@
 ﻿Your task is to polish the description and verify if the region description inside <think> matches the metadata of such region. 
 
 INSTRUCTIONS:
-1. Polish description: Replace any explicit region identifier tokens (e.g., "region 11", "ID=11", "cell 11", "#11") with a neutral reference ("this region", "the highlighted region")
+1. Polish description: Replace any explicit region identifier tokens (e.g., "region 11", "ID=11", "cell 11", "#11") with a neutral reference (e.g., "this region", "the highlighted region")
 
 2. Infer the following features from <Explanation> and output:
   - Time: speech or non-speech
