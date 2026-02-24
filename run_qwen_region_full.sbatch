@@ -9,6 +9,7 @@
 #SBATCH --output=logs/qwen_region_full_%A_%a.out
 #SBATCH --account=OD-237777
 #SBATCH --gres=gpu:4
+#SBATCH --array=0-3
 
 set -euo pipefail
 
@@ -40,7 +41,7 @@ INPUT_JSONL="${INPUT_JSONL:-}"
 GT_CSV="${GT_CSV:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/img/final_mask_topk/region_phone_table_topk3.csv}"
 SYSTEM_FILE="${SYSTEM_FILE:-${SCRIPT_DIR}/polisher_prompt/region_forensics_system.txt}"
 USER_TEMPLATE_FILE="${USER_TEMPLATE_FILE:-${SCRIPT_DIR}/polisher_prompt/region_forensics_user.txt}"
-SHARD_COUNT="${SHARD_COUNT:-1}"
+SHARD_COUNT="${SHARD_COUNT:-4}"
 SHARD_ID="${SHARD_ID:-${SLURM_ARRAY_TASK_ID:-0}}"
 MODEL_NAME="$(basename "${INPUT_MODEL_FOLDER%/}")"
 OUTPUT_BASE_DIR="/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/final__En/${MODEL_NAME}/verifier"
@@ -60,7 +61,7 @@ DO_SAMPLE="${DO_SAMPLE:-0}"
 TEMPERATURE="${TEMPERATURE:-0.7}"
 TOP_P="${TOP_P:-0.9}"
 TOP_K="${TOP_K:-20}"
-TENSOR_PARALLEL_SIZE="${TENSOR_PARALLEL_SIZE:-4}"
+TENSOR_PARALLEL_SIZE="${TENSOR_PARALLEL_SIZE:-1}"
 VLLM_GPU_MEMORY_UTILIZATION="${VLLM_GPU_MEMORY_UTILIZATION:-0.92}"
 VLLM_ENFORCE_EAGER="${VLLM_ENFORCE_EAGER:-0}"
 
