@@ -25,19 +25,24 @@ export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:T
 export VLLM_NO_USAGE_STATS="${VLLM_NO_USAGE_STATS:-1}"
 
 if [[ -n "${SCRIPT_DIR_OVERRIDE:-}" ]]; then
-  SCRIPT_DIR="${SCRIPT_DIR_OVERRIDE}"
-elif [[ -n "${SLURM_SUBMIT_DIR:-}" && -f "${SLURM_SUBMIT_DIR}/run_qwen_region_full.sbatch" ]]; then
-  SCRIPT_DIR="${SLURM_SUBMIT_DIR}"
-elif [[ -n "${SLURM_JOB_SCRIPT:-}" && -f "${SLURM_JOB_SCRIPT}" ]]; then
-  SCRIPT_DIR="$(cd "$(dirname "$(realpath "${SLURM_JOB_SCRIPT}")")" && pwd)"
+  SCRIPT_DIR="$(cd "${SCRIPT_DIR_OVERRIDE}" && pwd)"
 elif [[ -n "${BASH_SOURCE[0]:-}" && -f "${BASH_SOURCE[0]}" ]]; then
   SCRIPT_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
+elif [[ -n "${SLURM_JOB_SCRIPT:-}" && -f "${SLURM_JOB_SCRIPT}" ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "$(realpath "${SLURM_JOB_SCRIPT}")")" && pwd)"
+elif [[ -n "${SLURM_SUBMIT_DIR:-}" && -f "${SLURM_SUBMIT_DIR}/run_qwen_region_full.sbatch" ]]; then
+  SCRIPT_DIR="$(cd "${SLURM_SUBMIT_DIR}" && pwd)"
 else
   SCRIPT_DIR="$(pwd)"
 fi
 
 mkdir -p "${SCRIPT_DIR}/logs"
 cd "${SCRIPT_DIR}"
+if [[ ! -f "${SCRIPT_DIR}/artifact_polish_prompt.py" ]]; then
+  echo "[error] Missing verifier script: ${SCRIPT_DIR}/artifact_polish_prompt.py"
+  echo "[error] Set SCRIPT_DIR_OVERRIDE to the folder that contains artifact_polish_prompt.py"
+  exit 2
+fi
 
 MODEL_ID="${MODEL_ID:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/LLM/Qwen3-30B-A3B-Instruct-2507/}"
 INPUT_MODEL_FOLDER="${INPUT_MODEL_FOLDER:-/datasets/work/dss-deepfake-audio/work/data/datasets/interspeech/final__En/Qwen3-VL-30B-A3B-Thinking_}"
