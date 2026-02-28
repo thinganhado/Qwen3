@@ -48,12 +48,13 @@ def _normalize_method(method: str) -> str:
 
 def _extract_explanation_block(response_text: str) -> str:
     m_exp = re.search(
-        r"(<Explanation>\s*.*?\s*</Explanation>)",
+        r"<Explanation>\s*(.*?)\s*(?:</Explanation>|</think>)",
         response_text,
         flags=re.IGNORECASE | re.DOTALL,
     )
     if m_exp:
-        return m_exp.group(1).strip()
+        inner = m_exp.group(1).strip()
+        return f"<Explanation>{inner}</Explanation>"
     return ""
 
 
